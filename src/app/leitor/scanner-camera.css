@@ -66,3 +66,15 @@
   gap: 8px;
   margin-top: 12px;
 }
+
+.scanner__ajuda {
+  margin: 12px 0 0;
+  font-size: 0.8125rem;
+  line-height: 1.4;
+}
+
+.scanner__status {
+  margin: 12px 0 0;
+  font-size: 0.75rem;
+  opacity: 0.7;
+}

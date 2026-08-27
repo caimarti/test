@@ -3,11 +3,15 @@
 
   @if (estado() === 'lendo') {
     <div class="scanner__mira"></div>
-    <p class="scanner__dica">Enquadre o código de barras da chave de acesso</p>
+    <p class="scanner__dica">Enquadre apenas a faixa de barras, não o número impresso</p>
   }
 
   @if (estado() === 'iniciando') {
     <p class="scanner__aviso">Abrindo a câmera...</p>
+  }
+
+  @if (estado() === 'foto') {
+    <p class="scanner__aviso">Analisando a foto...</p>
   }
 
   @if (estado() === 'erro') {
@@ -23,7 +27,21 @@
 </div>
 
 @if (estado() === 'lendo') {
+  @if (demorando()) {
+    <p class="scanner__ajuda">
+      Sem leitura até agora. Aproxime até as barras ocuparem a largura da faixa, mantenha o
+      celular paralelo ao papel e espere o foco. Se não resolver, use a foto, que sai em
+      resolução bem maior.
+    </p>
+  }
+
   <div class="scanner__acoes">
+    <po-button
+      p-label="Ler por foto"
+      p-icon="an an-camera"
+      (p-click)="escolherFoto()">
+    </po-button>
+
     @if (temLanterna()) {
       <po-button
         [p-label]="lanternaLigada() ? 'Desligar lanterna' : 'Ligar lanterna'"
@@ -40,4 +58,14 @@
       </po-button>
     }
   </div>
+
+  <p class="scanner__status">
+    Câmera {{ resolucao() || 'indisponível' }} | {{ tentativas() }} tentativas de leitura
+  </p>
 }
+
+@if (mensagemFoto()) {
+  <p class="scanner__ajuda">{{ mensagemFoto() }}</p>
+}
+
+<input #arquivo type="file" accept="image/*" hidden (change)="aoEscolherFoto($event)" />
