@@ -1,0 +1,89 @@
+<po-page-default p-title="Leitor de chave de acesso">
+  <po-widget class="leitor__acao" [p-no-shadow]="true">
+    <po-button
+      class="leitor__botao-camera"
+      p-label="Ler com a câmera"
+      p-icon="an an-barcode"
+      p-kind="primary"
+      p-size="large"
+      (p-click)="abrirScanner()">
+    </po-button>
+
+    <po-divider p-label="ou digite"></po-divider>
+
+    <po-input
+      name="chaveManual"
+      p-label="Chave de acesso"
+      p-placeholder="44 dígitos"
+      p-icon="an an-keyboard"
+      [p-clean]="true"
+      p-help="Aceita a chave com ou sem espaços."
+      [(ngModel)]="chaveManual"
+      (p-enter)="confirmarDigitacao()">
+    </po-input>
+
+    <div class="leitor__acoes-secundarias">
+      <po-button p-label="Validar" (p-click)="confirmarDigitacao()"></po-button>
+      <po-button p-label="Limpar" p-kind="tertiary" (p-click)="limpar()"></po-button>
+    </div>
+
+    @if (alerta()) {
+      <po-tag class="leitor__alerta" [p-type]="tipoTag.Warning" p-icon="an an-warning" [p-value]="alerta()"></po-tag>
+    }
+  </po-widget>
+
+  @if (resultado(); as chave) {
+    <po-widget p-title="Documento identificado">
+      <po-tag [p-type]="tipoTag.Success" p-icon="an an-check-circle" p-value="Chave válida"></po-tag>
+
+      <p class="leitor__chave">{{ chave.chaveFormatada }}</p>
+
+      <div class="leitor__campos">
+        <po-info p-label="Documento" [p-value]="chave.modeloDescricao"></po-info>
+        <po-info p-label="Número" [p-value]="chave.numeroFormatado"></po-info>
+        <po-info p-label="Série" [p-value]="chave.serie"></po-info>
+        <po-info p-label="Emitente" [p-value]="chave.cnpjFormatado"></po-info>
+        <po-info p-label="UF" [p-value]="chave.ufSigla"></po-info>
+        <po-info p-label="Competência" [p-value]="chave.competencia"></po-info>
+        <po-info p-label="Tipo de emissão" [p-value]="chave.tipoEmissaoDescricao"></po-info>
+        <po-info p-label="Dígito verificador" [p-value]="chave.dv"></po-info>
+      </div>
+
+      <div class="leitor__acoes-secundarias">
+        <po-button p-label="Copiar chave" p-icon="an an-copy" (p-click)="copiarChave()"></po-button>
+        <po-button
+          p-label="Consultar no portal"
+          p-kind="tertiary"
+          (p-click)="consultarNoPortal()">
+        </po-button>
+      </div>
+    </po-widget>
+  }
+
+  @if (temHistorico()) {
+    <po-widget p-title="Últimas leituras">
+      <po-list-view
+        [p-items]="historico()"
+        p-property-title="documento"
+        [p-actions]="acoesHistorico">
+        <ng-template p-list-view-content-template let-item>
+          <p class="leitor__chave-historico">{{ item.chaveFormatada }}</p>
+          <p class="leitor__meta">
+            Emitente {{ item.emitente }} | lida em {{ formatarData(item.lidaEm) }}
+          </p>
+        </ng-template>
+      </po-list-view>
+    </po-widget>
+  }
+</po-page-default>
+
+<po-modal
+  #modalScanner
+  p-title="Ler chave de acesso"
+  p-size="md"
+  [p-primary-action]="acaoFecharScanner"
+  (p-close)="aoFecharModal()">
+  @if (scannerAtivo()) {
+    <app-scanner-camera (leitura)="aoLerCodigo($event)"></app-scanner-camera>
+  }
+</po-modal>

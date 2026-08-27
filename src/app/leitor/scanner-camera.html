@@ -1,0 +1,43 @@
+<div class="scanner">
+  <video #video class="scanner__video" muted autoplay playsinline></video>
+
+  @if (estado() === 'lendo') {
+    <div class="scanner__mira"></div>
+    <p class="scanner__dica">Enquadre o código de barras da chave de acesso</p>
+  }
+
+  @if (estado() === 'iniciando') {
+    <p class="scanner__aviso">Abrindo a câmera...</p>
+  }
+
+  @if (estado() === 'erro') {
+    <div class="scanner__erro">
+      <po-tag [p-type]="tipoTag.Danger" p-icon="an an-warning" [p-value]="mensagem()"></po-tag>
+      <po-button
+        p-label="Tentar novamente"
+        p-icon="an an-arrow-clockwise"
+        (p-click)="tentarNovamente()">
+      </po-button>
+    </div>
+  }
+</div>
+
+@if (estado() === 'lendo') {
+  <div class="scanner__acoes">
+    @if (temLanterna()) {
+      <po-button
+        [p-label]="lanternaLigada() ? 'Desligar lanterna' : 'Ligar lanterna'"
+        p-icon="an an-lightbulb"
+        (p-click)="alternarLanterna()">
+      </po-button>
+    }
+
+    @if (temOutrasCameras()) {
+      <po-button
+        p-label="Trocar câmera"
+        p-icon="an an-camera-rotate"
+        (p-click)="trocarCamera()">
+      </po-button>
+    }
+  </div>
+}

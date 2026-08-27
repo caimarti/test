@@ -1,0 +1,68 @@
+.scanner {
+  position: relative;
+  width: 100%;
+  aspect-ratio: 3 / 4;
+  max-height: 60vh;
+  background-color: #000;
+  border-radius: 8px;
+  overflow: hidden;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.scanner__video {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+/* Faixa horizontal, que é o formato do código de barras do DANFE. */
+.scanner__mira {
+  position: absolute;
+  top: 50%;
+  left: 8%;
+  width: 84%;
+  height: 22%;
+  transform: translateY(-50%);
+  border: 2px solid rgba(255, 255, 255, 0.9);
+  border-radius: 6px;
+  box-shadow: 0 0 0 100vmax rgba(0, 0, 0, 0.35);
+}
+
+.scanner__dica,
+.scanner__aviso {
+  position: absolute;
+  bottom: 12px;
+  left: 0;
+  right: 0;
+  margin: 0;
+  padding: 0 16px;
+  text-align: center;
+  color: #fff;
+  font-size: 0.875rem;
+}
+
+.scanner__aviso {
+  bottom: auto;
+}
+
+.scanner__erro {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+  text-align: center;
+  background-color: rgba(0, 0, 0, 0.75);
+}
+
+.scanner__acoes {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 12px;
+}

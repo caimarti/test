@@ -1,0 +1,49 @@
+.leitor__botao-camera {
+  display: block;
+  width: 100%;
+}
+
+/* O po-button renderiza um button interno, que precisa acompanhar a largura. */
+:host ::ng-deep .leitor__botao-camera button {
+  width: 100%;
+}
+
+.leitor__acoes-secundarias {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 16px;
+}
+
+.leitor__alerta {
+  display: inline-block;
+  margin-top: 16px;
+}
+
+.leitor__chave {
+  margin: 16px 0;
+  font-family: 'Courier New', monospace;
+  font-size: 1rem;
+  font-weight: 700;
+  letter-spacing: 0.5px;
+  word-break: break-all;
+}
+
+.leitor__campos {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+  gap: 12px 24px;
+}
+
+.leitor__chave-historico {
+  margin: 0;
+  font-family: 'Courier New', monospace;
+  font-size: 0.8125rem;
+  word-break: break-all;
+}
+
+.leitor__meta {
+  margin: 4px 0 0;
+  font-size: 0.75rem;
+  opacity: 0.75;
+}
