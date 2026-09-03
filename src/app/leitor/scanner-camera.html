@@ -61,8 +61,10 @@
 
   <p class="scanner__status">
     Câmera {{ resolucao() || 'indisponível' }} | {{ tentativas() }} tentativas de leitura
-    @if (fotoAltaAtiva()) {
-      | foto em alta resolução ativa
+    @switch (statusFotoAlta()) {
+      @case ('ativa') { | foto em alta resolução ativa }
+      @case ('desativada') { | foto em alta resolução desativada após falhas }
+      @case ('indisponivel') { | foto em alta resolução indisponível neste navegador }
     }
   </p>
 }

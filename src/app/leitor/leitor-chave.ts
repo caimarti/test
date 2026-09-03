@@ -185,12 +185,23 @@ export class LeitorChave {
     }
   }
 
+  /**
+   * A leitura contínua da câmera dispara a cada código de barras que passar na frente
+   * dela, inclusive um código de produto qualquer que esteja no ambiente, sem relação
+   * nenhuma com a chave de acesso. Interromper a leitura com um aviso de erro toda vez
+   * que isso acontece só atrapalha: o app continua escaneando, e o usuário nem percebe
+   * que pegou um código errado. Por isso, vindo da câmera, a recusa é silenciosa.
+   *
+   * Já a digitação manual e a foto avulsa são ações deliberadas e únicas: ali faz
+   * sentido avisar o que deu errado.
+   */
   private recusar(motivo: string, origem: 'camera' | 'manual' | 'historico'): void {
-    this.notificacao.error(motivo);
-
-    if (origem !== 'camera') {
-      this.alerta.set(motivo);
+    if (origem === 'camera') {
+      return;
     }
+
+    this.notificacao.error(motivo);
+    this.alerta.set(motivo);
   }
 
   /** Vibra e apita, porque no galpão ninguém fica olhando para a tela. */

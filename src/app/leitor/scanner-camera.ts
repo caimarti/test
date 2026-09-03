@@ -15,6 +15,13 @@ import { BarcodeFormat, DecodeHintType, NotFoundException, Result } from '@zxing
 
 type EstadoScanner = 'iniciando' | 'lendo' | 'foto' | 'erro';
 
+/**
+ * 'indisponivel': o navegador não suporta ImageCapture (é o caso do Safari/iOS).
+ * 'ativa': está tirando fotos automáticas em segundo plano.
+ * 'desativada': suportava, mas falhou tantas vezes seguidas que foi desligada.
+ */
+type StatusFotoAlta = 'indisponivel' | 'ativa' | 'desativada';
+
 /** Capabilities e constraints de lanterna e foco ainda não estão na tipagem padrão do DOM. */
 type CapacidadesExtras = MediaTrackCapabilities & { torch?: boolean; zoom?: { max: number } };
 
@@ -63,7 +70,7 @@ export class ScannerCamera implements AfterViewInit, OnDestroy {
   protected readonly resolucao = signal('');
   protected readonly tentativas = signal(0);
   protected readonly demorando = signal(false);
-  protected readonly fotoAltaAtiva = signal(false);
+  protected readonly statusFotoAlta = signal<StatusFotoAlta>('indisponivel');
 
   private leitor?: BrowserMultiFormatReader;
   private controles?: IScannerControls;
@@ -285,7 +292,7 @@ export class ScannerCamera implements AfterViewInit, OnDestroy {
     }
 
     let falhas = 0;
-    this.fotoAltaAtiva.set(true);
+    this.statusFotoAlta.set('ativa');
 
     this.relogioFotoAlta = setInterval(async () => {
       if (this.tirandoFotoAlta || this.estado() !== 'lendo') {
@@ -306,7 +313,7 @@ export class ScannerCamera implements AfterViewInit, OnDestroy {
         falhas = 0;
       } catch (erro) {
         if (erro instanceof NotFoundException) {
-          // Foto nítida, só que sem código de barras dentro do recorte. Segue tentando.
+          // Foto nítida, só que sem código de barras nela. Segue tentando.
           falhas = 0;
         } else {
           falhas++;
@@ -314,7 +321,7 @@ export class ScannerCamera implements AfterViewInit, OnDestroy {
           if (falhas >= LIMITE_FALHAS_FOTO_ALTA) {
             clearInterval(this.relogioFotoAlta);
             this.relogioFotoAlta = undefined;
-            this.zone.run(() => this.fotoAltaAtiva.set(false));
+            this.zone.run(() => this.statusFotoAlta.set('desativada'));
           }
         }
       } finally {
@@ -372,7 +379,7 @@ export class ScannerCamera implements AfterViewInit, OnDestroy {
     clearInterval(this.relogioFotoAlta);
     this.relogioFotoAlta = undefined;
     this.tirandoFotoAlta = false;
-    this.fotoAltaAtiva.set(false);
+    this.statusFotoAlta.set('indisponivel');
 
     this.controles?.stop();
     this.controles = undefined;
