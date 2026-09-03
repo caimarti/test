@@ -35,9 +35,6 @@ const SEGUNDOS_ATE_DICA = 8;
 /** Intervalo entre fotos automáticas em alta resolução, feitas em paralelo ao vídeo. */
 const INTERVALO_FOTO_ALTA_MS = 700;
 
-/** Faixa central da mira, em fração do quadro. Usada tanto no CSS quanto no recorte da foto. */
-const FAIXA_MIRA = { x: 0.08, y: 0.39, largura: 0.84, altura: 0.22 };
-
 /** Depois dessas falhas seguidas que não sejam "não achei", desiste da foto automática. */
 const LIMITE_FALHAS_FOTO_ALTA = 3;
 
@@ -217,15 +214,25 @@ export class ScannerCamera implements AfterViewInit, OnDestroy {
 
   /**
    * A chave de acesso tem 44 dígitos, o que dá um CODE-128 estreito e denso.
-   * Em 720p o celular costuma não resolver as barras, por isso pedimos o máximo
-   * que a câmera oferecer e foco contínuo.
+   *
+   * Pedimos "1920 de largura" mas o navegador decide sozinho qual eixo chama de
+   * largura e qual chama de altura, e em celular segurado na vertical ele costuma
+   * inverter os dois: já vimos aparelho entregar 1080x1920 mesmo pedindo o oposto.
+   * Por isso o ideal vai igual e alto nos dois eixos, para que, seja qual for o
+   * que o navegador decidir chamar de largura, o valor entregue seja grande.
+   *
+   * `resizeMode: 'none'` evita o Chrome reduzir a imagem para economizar CPU antes
+   * mesmo de ela chegar no stream.
    */
   private restricoesDeVideo(): MediaTrackConstraints {
     return {
       facingMode: { ideal: 'environment' },
-      width: { ideal: 1920 },
-      height: { ideal: 1080 },
-      advanced: [{ focusMode: 'continuous' } as MediaTrackConstraintSet]
+      width: { ideal: 3840 },
+      height: { ideal: 3840 },
+      advanced: [
+        { focusMode: 'continuous' } as MediaTrackConstraintSet,
+        { resizeMode: 'none' } as MediaTrackConstraintSet
+      ]
     };
   }
 
@@ -316,26 +323,37 @@ export class ScannerCamera implements AfterViewInit, OnDestroy {
     }, INTERVALO_FOTO_ALTA_MS);
   }
 
-  /** Recorta a foto na mesma faixa mostrada na mira, para não perder tempo decodificando o fundo. */
+  /**
+   * Decodifica a foto inteira, sem recortar.
+   *
+   * A ideia original era recortar só a faixa da mira, para não perder tempo com o
+   * fundo, calculando o recorte pela proporção do vídeo ao vivo. Só que a foto tirada
+   * pela ImageCapture não segue a mesma orientação nem a mesma proporção do vídeo:
+   * o sensor pode devolver uma foto na orientação nativa dele (por exemplo, no formato
+   * 4:3 típico de sensor, mesmo com o vídeo em pé no formato 9:16), e nesse caso a
+   * faixa recortada por porcentagem não corresponde ao mesmo pedaço da imagem que
+   * aparece na mira, então o corte errava o alvo. Decodificar a foto inteira custa
+   * mais CPU, mas garante que a chave está em algum lugar dentro da area analisada.
+   *
+   * `imageOrientation: 'from-image'` faz o navegador aplicar a rotação gravada no
+   * EXIF da foto antes de gerar os pixels. Sem isso, `createImageBitmap` ignora o
+   * EXIF por padrão e a imagem pode chegar deitada, ao contrário do que a tag
+   * `<img>` do botão "Ler por foto" já faz sozinha.
+   */
   private async decodificarFotoAlta(foto: Blob): Promise<string | null> {
     if (!this.leitor) {
       return null;
     }
 
-    const bitmap = await createImageBitmap(foto);
+    const bitmap = await createImageBitmap(foto, { imageOrientation: 'from-image' });
 
     try {
-      const origemX = bitmap.width * FAIXA_MIRA.x;
-      const origemY = bitmap.height * FAIXA_MIRA.y;
-      const largura = bitmap.width * FAIXA_MIRA.largura;
-      const altura = bitmap.height * FAIXA_MIRA.altura;
-
       const canvas = document.createElement('canvas');
-      canvas.width = largura;
-      canvas.height = altura;
+      canvas.width = bitmap.width;
+      canvas.height = bitmap.height;
 
       const contexto = canvas.getContext('2d');
-      contexto?.drawImage(bitmap, origemX, origemY, largura, altura, 0, 0, largura, altura);
+      contexto?.drawImage(bitmap, 0, 0);
 
       const resultado = this.leitor.decodeFromCanvas(canvas);
       return resultado.getText();
