@@ -73,4 +73,11 @@
   <p class="scanner__ajuda">{{ mensagemFoto() }}</p>
 }
 
-<input #arquivo type="file" accept="image/*" hidden (change)="aoEscolherFoto($event)" />
+<input
+  #arquivo
+  type="file"
+  accept="image/*"
+  capture="environment"
+  hidden
+  (change)="aoEscolherFoto($event)"
+/>
