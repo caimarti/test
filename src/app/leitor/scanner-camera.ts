@@ -11,15 +11,35 @@ import {
 } from '@angular/core';
 import { PoButtonModule, PoTagModule, PoTagType } from '@po-ui/ng-components';
 import { BrowserCodeReader, BrowserMultiFormatReader, IScannerControls } from '@zxing/browser';
-import { BarcodeFormat, DecodeHintType, Result } from '@zxing/library';
+import { BarcodeFormat, DecodeHintType, NotFoundException, Result } from '@zxing/library';
 
 type EstadoScanner = 'iniciando' | 'lendo' | 'foto' | 'erro';
 
 /** Capabilities e constraints de lanterna e foco ainda não estão na tipagem padrão do DOM. */
 type CapacidadesExtras = MediaTrackCapabilities & { torch?: boolean; zoom?: { max: number } };
 
-/** Segundos sem leitura antes de sugerir a foto. */
+/**
+ * A ImageCapture API ainda não está na lib DOM padrão do TypeScript.
+ * `takePhoto` devolve uma foto na resolução cheia do sensor, bem acima do que
+ * o stream de vídeo entrega, sem precisar abrir o app de câmera do sistema.
+ */
+interface FotografoDeQuadro {
+  takePhoto(): Promise<Blob>;
+}
+
+type ConstrutorImageCapture = new (track: MediaStreamTrack) => FotografoDeQuadro;
+
+/** Segundos sem leitura antes de sugerir a foto manual. */
 const SEGUNDOS_ATE_DICA = 8;
+
+/** Intervalo entre fotos automáticas em alta resolução, feitas em paralelo ao vídeo. */
+const INTERVALO_FOTO_ALTA_MS = 700;
+
+/** Faixa central da mira, em fração do quadro. Usada tanto no CSS quanto no recorte da foto. */
+const FAIXA_MIRA = { x: 0.08, y: 0.39, largura: 0.84, altura: 0.22 };
+
+/** Depois dessas falhas seguidas que não sejam "não achei", desiste da foto automática. */
+const LIMITE_FALHAS_FOTO_ALTA = 3;
 
 @Component({
   selector: 'app-scanner-camera',
@@ -46,6 +66,7 @@ export class ScannerCamera implements AfterViewInit, OnDestroy {
   protected readonly resolucao = signal('');
   protected readonly tentativas = signal(0);
   protected readonly demorando = signal(false);
+  protected readonly fotoAltaAtiva = signal(false);
 
   private leitor?: BrowserMultiFormatReader;
   private controles?: IScannerControls;
@@ -53,6 +74,8 @@ export class ScannerCamera implements AfterViewInit, OnDestroy {
   private indiceDispositivo = 0;
   private contador = 0;
   private relogioDica?: ReturnType<typeof setTimeout>;
+  private relogioFotoAlta?: ReturnType<typeof setInterval>;
+  private tirandoFotoAlta = false;
 
   async ngAfterViewInit(): Promise<void> {
     if (!navigator.mediaDevices?.getUserMedia) {
@@ -224,10 +247,114 @@ export class ScannerCamera implements AfterViewInit, OnDestroy {
       this.temLanterna.set(Boolean(capacidades?.torch));
       this.resolucao.set(ajustes?.width && ajustes?.height ? `${ajustes.width}x${ajustes.height}` : '');
     });
+
+    if (trilha) {
+      this.iniciarFotoAltaAutomatica(trilha);
+    }
+  }
+
+  /**
+   * Além de decodificar o vídeo ao vivo, tira fotos periódicas em segundo plano
+   * pela ImageCapture API. A foto sai na resolução plena do sensor, muito acima
+   * do stream de vídeo (que normalmente fica em 1080p mesmo em câmeras de 12MP+),
+   * e é assim que os apps de banco leem um código de barras denso sem falhar.
+   *
+   * Nem todo navegador suporta (o Safari/iOS não suporta), então isso é um reforço
+   * por cima da leitura do vídeo, nunca a única via.
+   */
+  private iniciarFotoAltaAutomatica(trilha: MediaStreamTrack): void {
+    const Construtor = (window as unknown as { ImageCapture?: ConstrutorImageCapture }).ImageCapture;
+
+    if (!Construtor) {
+      return;
+    }
+
+    let capturador: FotografoDeQuadro;
+
+    try {
+      capturador = new Construtor(trilha);
+    } catch {
+      return;
+    }
+
+    let falhas = 0;
+    this.fotoAltaAtiva.set(true);
+
+    this.relogioFotoAlta = setInterval(async () => {
+      if (this.tirandoFotoAlta || this.estado() !== 'lendo') {
+        return;
+      }
+
+      this.tirandoFotoAlta = true;
+
+      try {
+        const blob = await capturador.takePhoto();
+        const resultado = await this.decodificarFotoAlta(blob);
+
+        if (resultado) {
+          this.zone.run(() => this.leitura.emit(resultado));
+          return;
+        }
+
+        falhas = 0;
+      } catch (erro) {
+        if (erro instanceof NotFoundException) {
+          // Foto nítida, só que sem código de barras dentro do recorte. Segue tentando.
+          falhas = 0;
+        } else {
+          falhas++;
+
+          if (falhas >= LIMITE_FALHAS_FOTO_ALTA) {
+            clearInterval(this.relogioFotoAlta);
+            this.relogioFotoAlta = undefined;
+            this.zone.run(() => this.fotoAltaAtiva.set(false));
+          }
+        }
+      } finally {
+        this.tirandoFotoAlta = false;
+      }
+    }, INTERVALO_FOTO_ALTA_MS);
+  }
+
+  /** Recorta a foto na mesma faixa mostrada na mira, para não perder tempo decodificando o fundo. */
+  private async decodificarFotoAlta(foto: Blob): Promise<string | null> {
+    if (!this.leitor) {
+      return null;
+    }
+
+    const bitmap = await createImageBitmap(foto);
+
+    try {
+      const origemX = bitmap.width * FAIXA_MIRA.x;
+      const origemY = bitmap.height * FAIXA_MIRA.y;
+      const largura = bitmap.width * FAIXA_MIRA.largura;
+      const altura = bitmap.height * FAIXA_MIRA.altura;
+
+      const canvas = document.createElement('canvas');
+      canvas.width = largura;
+      canvas.height = altura;
+
+      const contexto = canvas.getContext('2d');
+      contexto?.drawImage(bitmap, origemX, origemY, largura, altura, 0, 0, largura, altura);
+
+      const resultado = this.leitor.decodeFromCanvas(canvas);
+      return resultado.getText();
+    } catch (erro) {
+      if (erro instanceof NotFoundException) {
+        return null;
+      }
+      throw erro;
+    } finally {
+      bitmap.close?.();
+    }
   }
 
   private encerrar(): void {
     clearTimeout(this.relogioDica);
+    clearInterval(this.relogioFotoAlta);
+    this.relogioFotoAlta = undefined;
+    this.tirandoFotoAlta = false;
+    this.fotoAltaAtiva.set(false);
 
     this.controles?.stop();
     this.controles = undefined;

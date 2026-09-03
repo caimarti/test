@@ -61,6 +61,9 @@
 
   <p class="scanner__status">
     Câmera {{ resolucao() || 'indisponível' }} | {{ tentativas() }} tentativas de leitura
+    @if (fotoAltaAtiva()) {
+      | foto em alta resolução ativa
+    }
   </p>
 }
 
